@@ -121,7 +121,7 @@ const lookupChannel = {
 }
 
 function getAllItems() {
-  const allItems = {
+  const testingItems = {
     'Adamant brutal': 4798,
     'Adamant dart': 810,
     'Adamant javelin': 829,
@@ -164,8 +164,8 @@ function getAllItems() {
   return axios.get(
     'https://raw.githubusercontent.com/NielsTack/runescape-3-grand-exchange-item-id-scraper/main/items.json',
   )
-    // .then((res) => res.data)
-    .then(() => allItems)
+    .then((res) => res.data)
+    // .then(() => testingItems)
 }
 
 function getBuyLimit(id) {
@@ -185,62 +185,82 @@ function getItemDetailsAndSendMessage(data) {
 
   return axios.get(`https://secure.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=${id}`)
     .then((res3) => {
-      const { type, icon } = res3.data.item
-      const nearMin = todaysPrice < (min * 1.1)
-      const nearMax = todaysPrice > (max * 0.9)
-      if (nearMin) {
-        // console.log(`sending near min message for ${name} in ${type}...`)
-        getBuyLimit(id).then((limit) => {
-          console.log('sending message to MIN')
-          // sendChannelMessage(lookupChannel[type], {
-          //   embed: createEmbed({
-          //     name, todaysPrice, max, min, icon, limit, buyOrSell: '__**BUY!**__',
-          //   }),
-          // })
-        })
-      }
-      if (!nearMin && nearMax) {
-        // console.log(`sending near max message for ${name} in ${type}...`)
-        getBuyLimit(id).then((limit) => {
-          console.log('sending message to MAX')
-          // sendChannelMessage(lookupChannel[type], {
-          //   embed: createEmbed({
-          //     name, todaysPrice, max, min, icon, limit, buyOrSell: '__**SELL!**__',
-          //   }),
-          // })
-        })
-      }
-    })
-    .catch((err) => { console.log(`Error getting details for: ${name} : ${id}\n Error: ${err}`) })
-}
-
-function getGraph(name, id) {
-  return axios.get(`https://secure.runescape.com/m=itemdb_rs/api/graph/${id}.json`)
-    .then((res2) => {
-      const { daily } = res2.data
-      let max = 0
-      let min = 99999999
-      let i = 0
-      let todaysPrice = 0
-
-      const isValuable = daily[Object.keys(daily)[0]] > 100
-      if (isValuable) {
-        Object.keys(daily).forEach((key) => {
-          const price = daily[key]
-          max = (price > max) ? price : max
-          min = (price < min) ? price : min
-          todaysPrice = (i === 179) ? price : todaysPrice
-          i += 1
-        })
-        // console.log(`${name} :  max: ${max}, min: ${min}, today: ${todaysPrice}`)
-        getItemDetailsAndSendMessage({
-          id, todaysPrice, min, max, name,
-        })
+      if (!res3 || !res3.data || !res3.data.item || !res3.data.item.type || !res3.data.item.icon) {
+        setTimeout(() => getItemDetailsAndSendMessage(data), 5000)
+      } else {
+        const { type, icon } = res3.data.item
+        const nearMin = todaysPrice < (min * 1.1)
+        const nearMax = todaysPrice > (max * 0.9)
+        if (nearMin) {
+          // console.log(`sending near min message for ${name} in ${type}...`)
+          getBuyLimit(id).then((limit) => {
+            console.log(`sending ${name} message to MIN`)
+            // sendChannelMessage(lookupChannel[type], {
+            //   embed: createEmbed({
+            //     name, todaysPrice, max, min, icon, limit, buyOrSell: '__**BUY!**__',
+            //   }),
+            // })
+          })
+        }
+        if (!nearMin && nearMax) {
+          // console.log(`sending near max message for ${name} in ${type}...`)
+          getBuyLimit(id).then((limit) => {
+            console.log(`sending ${name} message to MAX`)
+            // sendChannelMessage(lookupChannel[type], {
+            //   embed: createEmbed({
+            //     name, todaysPrice, max, min, icon, limit, buyOrSell: '__**SELL!**__',
+            //   }),
+            // })
+          })
+        }
       }
     })
     .catch((err) => {
-      console.log(`graph ${name} : ${id} - ${err}`)
-      setTimeout(() => getGraph(name, id), 10000)
+      if (!!id && !!todaysPrice && !!min && !!max && !!name) {
+        setTimeout(() => getItemDetailsAndSendMessage(
+          id, todaysPrice, min, max, name,
+        ),
+        5000)
+      } else {
+        // console.log(`Error getting details: ${name} - ${id} - ${todaysPrice} - ${min} - ${max}`)
+        console.log(`Error: ${err}`)
+      }
+    })
+}
+
+function getGraph(name, id, timeout) {
+  return axios.get(`https://secure.runescape.com/m=itemdb_rs/api/graph/${id}.json`)
+    .then((res2) => {
+      if (!res2 || !res2.data || !res2.data.daily) {
+        setTimeout(() => getGraph(name, id, timeout), timeout)
+      } else {
+        const { daily } = res2.data
+        let max = 0
+        let min = 99999999
+        let i = 0
+        let todaysPrice = 0
+
+        const isValuable = daily[Object.keys(daily)[0]] > 100
+        if (isValuable) {
+          Object.keys(daily).forEach((key) => {
+            const price = daily[key]
+            max = (price > max) ? price : max
+            min = (price < min) ? price : min
+            todaysPrice = (i === 179) ? price : todaysPrice
+            i += 1
+          })
+          if (!!id && !!todaysPrice && !!min && !!max && !!name) {
+            getItemDetailsAndSendMessage({
+              id, todaysPrice, min, max, name,
+            })
+          } else {
+            console.log(`missing data - ${name} :  max: ${max}, min: ${min}, today: ${todaysPrice}`)
+          }
+        }
+      }
+    })
+    .catch((err) => {
+      console.log(`attempted to fetch: ${name} : ${id} - ${err}`)
     })
 }
 
@@ -256,12 +276,12 @@ function chunkArray(array, size) {
 function calculateProfit() {
   getAllItems().then((allItems) => {
     const chunks = chunkArray(Object.entries(allItems), 5)
-    chunks.forEach((chunk) => {
-      console.log(chunk)
+    chunks.forEach((chunk, index) => {
       chunk.forEach((curItem) => {
         const name = curItem[0]
         const id = curItem[1]
-        setTimeout(() => getGraph(name, id), 6000)
+        const timeout = 5000 * index
+        setTimeout(() => getGraph(name, id, timeout), timeout)
       })
     })
   })
@@ -272,7 +292,7 @@ client.on('message', (message) => {
   const channelName = message.channel.name
   if (serverName === 'RS 🔥') {
     if (channelName === 'lul') {
-      calculateProfit(message)
+      calculateProfit()
     }
   }
 })
