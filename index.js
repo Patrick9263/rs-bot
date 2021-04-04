@@ -3,6 +3,9 @@ const Discord = require('discord.js')
 const axios = require('axios').default
 
 const client = new Discord.Client()
+let tracker = 0
+let allOverlaps = []
+let getBuyLimit = {}
 // const logo = new Discord.MessageAttachment('./public/logo.png')
 
 // discord developer portal
@@ -26,7 +29,7 @@ function sendChannelMessage(channelName, message) {
 
 function createEmbed(data) {
   const {
-    name, todaysPrice, max, min, icon, limit, buyOrSell,
+    name, description, todaysPrice, max, min, icon, limit, buyOrSell,
   } = data
 
   const fields = []
@@ -37,6 +40,7 @@ function createEmbed(data) {
   }
   return {
     color: 0x0099ff,
+    description,
     title: buyOrSell,
     author: {
       name,
@@ -53,17 +57,18 @@ function createEmbed(data) {
         value: `${todaysPrice} gp`,
         inline: true,
       },
+      emptyField,
       {
         name: '__Buy Limit__',
         value: limit,
         inline: true,
       },
-      emptyField,
       {
         name: '__Max__',
         value: `${max} gp`,
         inline: true,
       },
+      emptyField,
       {
         name: '__Min__',
         value: `${min} gp`,
@@ -121,14 +126,16 @@ const lookupChannel = {
 }
 
 function getAllItems() {
+  // eslint-disable-next-line no-unused-vars
   const testingItems = {
+    'Air orb': 573,
+    'Gold Bar': 2357,
     'Adamant brutal': 4798,
     'Adamant dart': 810,
     'Adamant javelin': 829,
     'Adamant knife': 867,
     'Adamant throwing axe': 804,
     'Azure skillchompa': 31597,
-    'Gold Bar': 2357,
     'Gilded 4-poster': 8588,
     'Gilded bench': 8574,
     'Gilded cape rack': 9846,
@@ -168,16 +175,6 @@ function getAllItems() {
     // .then(() => testingItems)
 }
 
-function getBuyLimit(id) {
-  return axios.get(
-    'https://raw.githubusercontent.com/NielsTack/runescape-buy-limit-per-item-id/master/buylimits.json',
-  )
-    .then((res) => {
-      const { data } = res
-      return data[id]
-    })
-}
-
 function getItemDetailsAndSendMessage(data) {
   const {
     id, todaysPrice, min, max, name,
@@ -191,26 +188,41 @@ function getItemDetailsAndSendMessage(data) {
         const { type, icon } = res3.data.item
         const nearMin = todaysPrice < (min * 1.1)
         const nearMax = todaysPrice > (max * 0.9)
-        if (nearMin) {
+        const hasOverlap = (max * 0.9) <= (min * 1.1)
+        const limit = getBuyLimit[id]
+        const potentialProfit = (max - min) * limit
+        const exclude = potentialProfit <= 2000000
+        const isSafeBet = potentialProfit > 2000000 && potentialProfit <= 4000000
+        const isRiskyBet = potentialProfit > 4000000 && potentialProfit <= 10000000
+        const isHolyCheeks = potentialProfit > 10000000
+        const description = lookupChannel[type]
+        let channelName = isSafeBet ? 'safe-bets' : ''
+        channelName = isRiskyBet ? 'risky-bets' : channelName
+        channelName = isHolyCheeks ? 'holy-ch33ks-bets' : channelName
+
+        tracker += 1
+        console.log(`#${tracker} : ${name} in ${type}`)
+        if (hasOverlap) allOverlaps.push(id)
+        if ((tracker % 250) === 0) {
+          sendChannelMessage('overlaps', allOverlaps.join(', '))
+          allOverlaps = []
+        }
+
+        if (!exclude && !hasOverlap && nearMin) {
           // console.log(`sending near min message for ${name} in ${type}...`)
-          getBuyLimit(id).then((limit) => {
-            console.log(`sending ${name} message to MIN`)
-            // sendChannelMessage(lookupChannel[type], {
-            //   embed: createEmbed({
-            //     name, todaysPrice, max, min, icon, limit, buyOrSell: '__**BUY!**__',
-            //   }),
-            // })
+          sendChannelMessage(channelName, {
+            embed: createEmbed({
+              name, description, todaysPrice, max, min, icon, limit, buyOrSell: '__**BUY!**__',
+            }),
           })
         }
-        if (!nearMin && nearMax) {
+
+        if (!exclude && !hasOverlap && nearMax) {
           // console.log(`sending near max message for ${name} in ${type}...`)
-          getBuyLimit(id).then((limit) => {
-            console.log(`sending ${name} message to MAX`)
-            // sendChannelMessage(lookupChannel[type], {
-            //   embed: createEmbed({
-            //     name, todaysPrice, max, min, icon, limit, buyOrSell: '__**SELL!**__',
-            //   }),
-            // })
+          sendChannelMessage(channelName, {
+            embed: createEmbed({
+              name, description, todaysPrice, max, min, icon, limit, buyOrSell: '__**SELL!**__',
+            }),
           })
         }
       }
@@ -236,7 +248,7 @@ function getGraph(name, id, timeout) {
       } else {
         const { daily } = res2.data
         let max = 0
-        let min = 99999999
+        let min = 2147483647
         let i = 0
         let todaysPrice = 0
 
@@ -259,9 +271,7 @@ function getGraph(name, id, timeout) {
         }
       }
     })
-    .catch((err) => {
-      console.log(`attempted to fetch: ${name} : ${id} - ${err}`)
-    })
+    .catch((err) => console.log(`attempted to fetch: ${name} : ${id} - ${err}`))
 }
 
 function chunkArray(array, size) {
@@ -274,14 +284,21 @@ function chunkArray(array, size) {
 }
 
 function calculateProfit() {
-  getAllItems().then((allItems) => {
-    const chunks = chunkArray(Object.entries(allItems), 5)
-    chunks.forEach((chunk, index) => {
-      chunk.forEach((curItem) => {
-        const name = curItem[0]
-        const id = curItem[1]
-        const timeout = 5000 * index
-        setTimeout(() => getGraph(name, id, timeout), timeout)
+  tracker = 0
+  axios.get(
+    'https://raw.githubusercontent.com/NielsTack/runescape-buy-limit-per-item-id/master/buylimits.json',
+  ).then((res) => {
+    getBuyLimit = res.data
+
+    getAllItems().then((allItems) => {
+      const chunks = chunkArray(Object.entries(allItems), 1)
+      chunks.forEach((chunk, index) => {
+        chunk.forEach((curItem) => {
+          const name = curItem[0]
+          const id = curItem[1]
+          const timeout = 5000 * index
+          setTimeout(() => getGraph(name, id, timeout), timeout)
+        })
       })
     })
   })
@@ -290,9 +307,7 @@ function calculateProfit() {
 client.on('message', (message) => {
   const serverName = message.guild.name
   const channelName = message.channel.name
-  if (serverName === 'RS 🔥') {
-    if (channelName === 'lul') {
-      calculateProfit()
-    }
+  if (serverName === 'RS 🔥' && channelName === 'lul') {
+    setTimeout(calculateProfit, 0)
   }
 })
