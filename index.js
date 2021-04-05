@@ -372,8 +372,8 @@ function getAllItems() {
     // 'https://raw.githubusercontent.com/NielsTack/runescape-3-grand-exchange-item-id-scraper/main/items.json',
     'https://raw.githubusercontent.com/NielsTack/runescape-3-item-database/master/iteminfo.json',
   )
-    // .then((res) => res.data)
-    .then(() => testingItems)
+    .then((res) => res.data)
+    // .then(() => testingItems)
 }
 
 function chunkArray(array, size) {
