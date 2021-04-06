@@ -7,16 +7,7 @@ let tracker = 0
 let allOverlaps = []
 const smittList = []
 const nigelList = []
-let itemInfo = {
-  573: {
-    name: 'Air orb',
-    buylimit: 5000,
-    type: 'crafting-materials',
-    icon: 'https://secure.runescape.com/m=itemdb_rs/1617015063009_obj_sprite.gif?id=573',
-    icon_large: 'https://secure.runescape.com/m=itemdb_rs/1617015063009_obj_sprite.gif?id=573',
-    id: 573,
-  },
-}
+let itemInfo = {}
 // const logo = new Discord.MessageAttachment('./public/logo.png')
 
 // discord developer portal
@@ -88,13 +79,16 @@ function createEmbed({
   }
 }
 
+// eslint-disable-next-line no-unused-vars
 function printTrackDataAndSendOverlaps(name, description, hasOverlap, id) {
   tracker += 1
   console.log(`#${tracker} : ${name} in ${description}`)
   if (hasOverlap) allOverlaps.push(id)
 
   if ((tracker % 250) === 0) {
-    sendChannelMessage('overlaps', allOverlaps.join(', '))
+    if (allOverlaps.length > 0) {
+      sendChannelMessage('overlaps', allOverlaps.join(', '))
+    }
     allOverlaps = []
   }
 }
@@ -129,7 +123,7 @@ function calculateProfitAndSendMessage(
     }),
   }
 
-  printTrackDataAndSendOverlaps(name, description, hasOverlap, id)
+  // printTrackDataAndSendOverlaps(name, description, hasOverlap, id)
 
   if (dontFilter && nearMin) {
     sendChannelMessage(channelName, buyMessage)
@@ -370,7 +364,8 @@ function getAllItems() {
   }
   return axios.get(
     // 'https://raw.githubusercontent.com/NielsTack/runescape-3-grand-exchange-item-id-scraper/main/items.json',
-    'https://raw.githubusercontent.com/NielsTack/runescape-3-item-database/master/iteminfo.json',
+    // 'https://raw.githubusercontent.com/NielsTack/runescape-3-item-database/master/iteminfo.json',
+    'https://raw.githubusercontent.com/NielsTack/runescape-3-item-database/master/iteminfo_filtered.json',
   )
     .then((res) => res.data)
     // .then(() => testingItems)
