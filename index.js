@@ -13,12 +13,6 @@ let itemInfo = {}
 // discord developer portal
 // https://discordjs.guide/popular-topics/embeds.html#embed-preview
 
-console.log(' -------------------------------- Starting --------------------------------')
-client.on('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`)
-})
-client.login(process.env.TOKEN)
-
 function sendChannelMessage(channelName, message) {
   const theChannel = client.channels.cache.find((channel) => channel.name === channelName)
   if (theChannel) {
@@ -26,6 +20,10 @@ function sendChannelMessage(channelName, message) {
   } else {
     console.log(`Channel: ${channelName} does not exist`)
   }
+}
+
+function getChannelID(channelName) {
+  return client.channels.cache.find((channel) => channel.name === channelName).id
 }
 
 function createEmbed({
@@ -53,24 +51,24 @@ function createEmbed({
     fields: [
       {
         name: '__Today__',
-        value: `${todaysPrice} gp`,
+        value: `${todaysPrice.toLocaleString()} gp`,
         inline: true,
       },
       emptyField,
       {
         name: '__Buy Limit__',
-        value: buyLimit,
+        value: buyLimit.toLocaleString(),
         inline: true,
       },
       {
         name: '__Max__',
-        value: `${max} gp`,
+        value: `${max.toLocaleString()} gp`,
         inline: true,
       },
       emptyField,
       {
         name: '__Min__',
-        value: `${min} gp`,
+        value: `${min.toLocaleString()} gp`,
         inline: true,
       },
       ...fields,
@@ -380,8 +378,26 @@ function chunkArray(array, size) {
   return result
 }
 
+function getTrackingIDsFromChannel() {
+  const addFavorites = (channelID, userList) => {
+    channelID.messages.fetch({ limit: 1 }).then((messages) => {
+      messages.forEach((message) => {
+        message.content.split(', ').forEach((id) => {
+          userList.push(parseInt(id, 10))
+        })
+      })
+    })
+  }
+  // console.log(client.channels.cache)
+  const smittIdChannel = client.channels.cache.get('828069115893776444')
+  const nigelIdChannel = client.channels.cache.get('828069132795904010')
+  addFavorites(smittIdChannel, smittList)
+  addFavorites(nigelIdChannel, nigelList)
+}
+
 function getItemsThenGraph() {
   tracker = 0
+  getTrackingIDsFromChannel()
   getAllItems().then((allItems) => {
     itemInfo = { ...itemInfo, ...allItems }
     const chunks = chunkArray(Object.entries(allItems), 1)
@@ -404,31 +420,59 @@ function getItemsThenGraph() {
   })
 }
 
-function getTrackingIDsFromChannel() {
-  const addFavorites = (channelID, userList) => {
-    channelID.messages.fetch({ limit: 1 }).then((messages) => {
+async function clear(channelID) {
+  // const fetched = await msg.channel.fetchMessages({ limit: 99 })
+  // msg.channel.bulkDelete(fetched)
+  // const testChannel = client.channels.cache.get('830205010083184670')
+  const theChannel = client.channels.cache.get(channelID.toString())
+  while (true) {
+    theChannel.messages.fetch({ limit: 99 }).then((messages) => {
       messages.forEach((message) => {
-        message.content.split(', ').forEach((id) => {
-          userList.push(parseInt(id, 10))
-        })
+        message.delete()
       })
     })
   }
-  // console.log(client.channels.cache)
-  const smittIdChannel = client.channels.cache.get('828069115893776444')
-  const nigelIdChannel = client.channels.cache.get('828069132795904010')
-  addFavorites(smittIdChannel, smittList)
-  addFavorites(nigelIdChannel, nigelList)
 }
 
-client.on('message', (message) => {
-  const serverName = message.guild.name
-  const channelName = message.channel.name
-  if (serverName === 'RS 🔥' && channelName === 'lul') {
-    getTrackingIDsFromChannel()
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
-    // eslint-disable-next-line no-unused-vars
+async function main() {
+  console.log(' -------------------------------- Starting --------------------------------')
+
+  client.on('ready', () => {
+    console.log(`Logged in as ${client.user.tag}`)
+  })
+
+  client.login(process.env.TOKEN)
+
+  client.on('message', async (message) => {
+    const serverName = message.guild.name
+    const channelName = message.channel.name
     const oneHour = 3600000
-    setTimeout(getItemsThenGraph, 0)
-  }
-})
+    if (message.content.toLowerCase().startsWith('!clearchat')) {
+      // console.log(message.channel.id)
+      // console.log(getChannelID('safe-bets'))
+      console.log('clear chat...');
+      clear(message.channel.id)
+      // clear(message)
+    }
+
+    if (serverName === 'RS 🔥' && channelName === 'lul') {
+      console.log('Starting in 4 hours...')
+      await sleep(oneHour * 2)
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const date = new Date()
+        const timeStamp = `( ${date.toLocaleDateString()} - ${date.toLocaleTimeString} )`
+        console.log(`Running daily price checks... ${timeStamp}`)
+        getItemsThenGraph()
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(oneHour * 24)
+      }
+    }
+  })
+}
+
+main()
