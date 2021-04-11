@@ -13,17 +13,17 @@ let itemInfo = {}
 // discord developer portal
 // https://discordjs.guide/popular-topics/embeds.html#embed-preview
 
+function getChannel(channelName) {
+  return client.channels.cache.find((channel) => channel.name === channelName)
+}
+
 function sendChannelMessage(channelName, message) {
-  const theChannel = client.channels.cache.find((channel) => channel.name === channelName)
+  const theChannel = getChannel(channelName)
   if (theChannel) {
     theChannel.send(message)
   } else {
     console.log(`Channel: ${channelName} does not exist`)
   }
-}
-
-function getChannelID(channelName) {
-  return client.channels.cache.find((channel) => channel.name === channelName).id
 }
 
 function createEmbed({
@@ -420,22 +420,17 @@ function getItemsThenGraph() {
   })
 }
 
-async function clear(channelID) {
-  // const fetched = await msg.channel.fetchMessages({ limit: 99 })
-  // msg.channel.bulkDelete(fetched)
-  // const testChannel = client.channels.cache.get('830205010083184670')
-  const theChannel = client.channels.cache.get(channelID.toString())
-  while (true) {
-    theChannel.messages.fetch({ limit: 99 }).then((messages) => {
-      messages.forEach((message) => {
-        message.delete()
-      })
-    })
-  }
-}
-
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function clearBetsChannel(message) {
+  const { name } = message.channel
+  message.channel.delete().then(() => {
+    message.guild.channels.create(name, Discord.CategoryChannel).then(() => {
+      getChannel(name).setParent(getChannel('bets').id)
+    })
+  })
 }
 
 async function main() {
@@ -451,12 +446,9 @@ async function main() {
     const serverName = message.guild.name
     const channelName = message.channel.name
     const oneHour = 3600000
-    if (message.content.toLowerCase().startsWith('!clearchat')) {
-      // console.log(message.channel.id)
-      // console.log(getChannelID('safe-bets'))
-      console.log('clear chat...');
-      clear(message.channel.id)
-      // clear(message)
+
+    if (message.content.toLowerCase().startsWith('!clear')) {
+      clearBetsChannel(message)
     }
 
     if (serverName === 'RS 🔥' && channelName === 'lul') {
@@ -464,6 +456,11 @@ async function main() {
       await sleep(oneHour * 2)
       // eslint-disable-next-line no-constant-condition
       while (true) {
+        sendChannelMessage('safe-bets', '!clear')
+        sendChannelMessage('risky-bets', '!clear')
+        sendChannelMessage('holy-ch33ks-bets', '!clear')
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(1000)
         const date = new Date()
         const timeStamp = `( ${date.toLocaleDateString()} - ${date.toLocaleTimeString} )`
         console.log(`Running daily price checks... ${timeStamp}`)
