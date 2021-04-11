@@ -453,7 +453,7 @@ async function main() {
 
     if (serverName === 'RS 🔥' && channelName === 'lul') {
       console.log('Starting in 4 hours...')
-      await sleep(oneHour * 2)
+      // await sleep(oneHour * 2)
       // eslint-disable-next-line no-constant-condition
       while (true) {
         sendChannelMessage('safe-bets', '!clear')
@@ -462,7 +462,7 @@ async function main() {
         // eslint-disable-next-line no-await-in-loop
         await sleep(1000)
         const date = new Date()
-        const timeStamp = `( ${date.toLocaleDateString()} - ${date.toLocaleTimeString} )`
+        const timeStamp = `( ${date.toLocaleDateString()} - ${date.toLocaleTimeString()} )`
         console.log(`Running daily price checks... ${timeStamp}`)
         getItemsThenGraph()
         // eslint-disable-next-line no-await-in-loop
