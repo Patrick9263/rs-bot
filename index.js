@@ -27,7 +27,7 @@ function sendChannelMessage(channelName, message) {
 }
 
 function createEmbed({
-  name, description, todaysPrice, max, min, icon, buyLimit, buyOrSell,
+  name, id, description, todaysPrice, max, min, icon, buyLimit, buyOrSell,
 }) {
   const fields = []
   const emptyField = {
@@ -54,7 +54,11 @@ function createEmbed({
         value: `${todaysPrice.toLocaleString()} gp`,
         inline: true,
       },
-      emptyField,
+      {
+        name: 'ID',
+        value: id,
+        inline: true,
+      },
       {
         name: '__Buy Limit__',
         value: buyLimit.toLocaleString(),
@@ -108,16 +112,16 @@ function calculateProfitAndSendMessage(
   let channelName = isSafeBet ? 'safe-bets' : ''
   channelName = isRiskyBet ? 'risky-bets' : channelName
   channelName = isHolyCheeks ? 'holy-ch33ks-bets' : channelName
-  const isInOurLists = smittList.includes(id) || nigelList.includes(id)
+  const isInOurLists = smittList.includes(parseInt(id, 10)) || nigelList.includes(parseInt(id, 10))
 
   const buyMessage = {
     embed: createEmbed({
-      name, description, todaysPrice, max, min, icon, buyLimit, buyOrSell: '__**BUY!**__',
+      name, id, description, todaysPrice, max, min, icon, buyLimit, buyOrSell: '__**BUY!**__',
     }),
   }
   const sellMessage = {
     embed: createEmbed({
-      name, description, todaysPrice, max, min, icon, buyLimit, buyOrSell: '__**SELL!**__',
+      name, id, description, todaysPrice, max, min, icon, buyLimit, buyOrSell: '__**SELL!**__',
     }),
   }
 
@@ -131,12 +135,12 @@ function calculateProfitAndSendMessage(
   }
 
   if (dontFilter && nearMin && isInOurLists) {
-    if (smittList.includes(id)) sendChannelMessage('smittward-list', buyMessage)
-    if (nigelList.includes(id)) sendChannelMessage('nigel-list', buyMessage)
+    if (smittList.includes(parseInt(id, 10))) sendChannelMessage('smittward-list', buyMessage)
+    if (nigelList.includes(parseInt(id, 10))) sendChannelMessage('nigel-list', buyMessage)
   }
   if (dontFilter && nearMax && isInOurLists) {
-    if (smittList.includes(id)) sendChannelMessage('smittward-list', sellMessage)
-    if (nigelList.includes(id)) sendChannelMessage('nigel-list', sellMessage)
+    if (smittList.includes(parseInt(id, 10))) sendChannelMessage('smittward-list', sellMessage)
+    if (nigelList.includes(parseInt(id, 10))) sendChannelMessage('nigel-list', sellMessage)
   }
 }
 
@@ -452,15 +456,17 @@ async function main() {
     }
 
     if (serverName === 'RS 🔥' && channelName === 'lul') {
-      console.log('Starting in 4 hours...')
-      // await sleep(oneHour * 2)
+      await sleep(oneHour * 4)
+
       // eslint-disable-next-line no-constant-condition
       while (true) {
         sendChannelMessage('safe-bets', '!clear')
         sendChannelMessage('risky-bets', '!clear')
         sendChannelMessage('holy-ch33ks-bets', '!clear')
+
         // eslint-disable-next-line no-await-in-loop
-        await sleep(1000)
+        await sleep(3000)
+
         const date = new Date()
         const timeStamp = `( ${date.toLocaleDateString()} - ${date.toLocaleTimeString()} )`
         console.log(`Running daily price checks... ${timeStamp}`)
