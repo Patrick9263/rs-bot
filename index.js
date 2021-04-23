@@ -27,7 +27,17 @@ function sendChannelMessage(channelName, message) {
 }
 
 function createEmbed({
-  name, id, description, todaysPrice, max, min, icon, buyLimit, buyOrSell,
+  name,
+  id,
+  description,
+  todaysPrice,
+  max,
+  min,
+  potentialProfit,
+  potentialLoss,
+  icon,
+  buyLimit,
+  buyOrSell,
 }) {
   const fields = []
   const emptyField = {
@@ -75,6 +85,17 @@ function createEmbed({
         value: `${min.toLocaleString()} gp`,
         inline: true,
       },
+      {
+        name: 'Max Profit',
+        value: `${potentialProfit.toLocaleString()} gp`,
+        inline: true,
+      },
+      emptyField,
+      {
+        name: 'Max Loss',
+        value: `${potentialLoss.toLocaleString()} gp`,
+        inline: true,
+      },
       ...fields,
     ],
     timestamp: new Date(),
@@ -101,7 +122,8 @@ function calculateProfitAndSendMessage(
   const nearMin = todaysPrice < (min * 1.1)
   const nearMax = todaysPrice > (max * 0.9)
   const hasOverlap = (max * 0.9) <= (min * 1.1)
-  const potentialProfit = (max - min) * buyLimit
+  const potentialProfit = (max - todaysPrice) * buyLimit
+  const potentialLoss = (min - todaysPrice) * buyLimit
 
   const exclude = potentialProfit <= 2000000
   const isSafeBet = potentialProfit > 2000000 && potentialProfit <= 4000000
@@ -116,12 +138,12 @@ function calculateProfitAndSendMessage(
 
   const buyMessage = {
     embed: createEmbed({
-      name, id, description, todaysPrice, max, min, icon, buyLimit, buyOrSell: '__**BUY!**__',
+      name, id, description, todaysPrice, max, min, potentialProfit, potentialLoss, icon, buyLimit, buyOrSell: '__**BUY!**__',
     }),
   }
   const sellMessage = {
     embed: createEmbed({
-      name, id, description, todaysPrice, max, min, icon, buyLimit, buyOrSell: '__**SELL!**__',
+      name, id, description, todaysPrice, max, min, potentialProfit, potentialLoss, icon, buyLimit, buyOrSell: '__**SELL!**__',
     }),
   }
 
@@ -458,7 +480,8 @@ async function main() {
     }
 
     if (serverName === 'RS 🔥' && channelName === 'lul') {
-      await sleep(oneHour * 8)
+      console.log('Waiting 11 hours to start bot...')
+      await sleep(oneHour * 11)
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
