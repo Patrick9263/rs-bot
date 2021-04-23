@@ -5,8 +5,8 @@ const axios = require('axios').default
 const client = new Discord.Client()
 let tracker = 0
 let allOverlaps = []
-const smittList = []
-const nigelList = []
+let smittList = []
+let nigelList = []
 let itemInfo = {}
 // const logo = new Discord.MessageAttachment('./public/logo.png')
 
@@ -383,6 +383,8 @@ function chunkArray(array, size) {
 }
 
 function getTrackingIDsFromChannel() {
+  smittList = []
+  nigelList = []
   const addFavorites = (channelID, userList) => {
     channelID.messages.fetch({ limit: 1 }).then((messages) => {
       messages.forEach((message) => {
@@ -456,16 +458,19 @@ async function main() {
     }
 
     if (serverName === 'RS 🔥' && channelName === 'lul') {
-      await sleep(oneHour * 4)
+      await sleep(oneHour * 8)
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
         sendChannelMessage('safe-bets', '!clear')
-        sendChannelMessage('risky-bets', '!clear')
-        sendChannelMessage('holy-ch33ks-bets', '!clear')
-
         // eslint-disable-next-line no-await-in-loop
-        await sleep(3000)
+        await sleep(1000)
+        sendChannelMessage('risky-bets', '!clear')
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(1000)
+        sendChannelMessage('holy-ch33ks-bets', '!clear')
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(1000)
 
         const date = new Date()
         const timeStamp = `( ${date.toLocaleDateString()} - ${date.toLocaleTimeString()} )`
