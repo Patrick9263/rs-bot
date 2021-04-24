@@ -31,8 +31,12 @@ function createEmbed({
   id,
   description,
   todaysPrice,
-  max,
   min,
+  max,
+  minDate,
+  maxDate,
+  daysSinceMin,
+  daysSinceMax,
   potentialProfit,
   potentialLoss,
   icon,
@@ -65,7 +69,7 @@ function createEmbed({
         inline: true,
       },
       {
-        name: 'ID',
+        name: '__ID__',
         value: id,
         inline: true,
       },
@@ -75,24 +79,24 @@ function createEmbed({
         inline: true,
       },
       {
-        name: '__Max__',
+        name: `__Max - ${maxDate}__`,
         value: `${max.toLocaleString()} gp`,
         inline: true,
       },
       emptyField,
       {
-        name: '__Min__',
+        name: `__Min - ${minDate}__`,
         value: `${min.toLocaleString()} gp`,
         inline: true,
       },
       {
-        name: 'Max Profit',
+        name: `__Max Profit - ${daysSinceMax} days ago__`,
         value: `${potentialProfit.toLocaleString()} gp`,
         inline: true,
       },
       emptyField,
       {
-        name: 'Max Loss',
+        name: `__Max Loss - ${daysSinceMin} days ago__`,
         value: `${potentialLoss.toLocaleString()} gp`,
         inline: true,
       },
@@ -117,13 +121,18 @@ function printTrackDataAndSendOverlaps(name, description, hasOverlap, id) {
 }
 
 function calculateProfitAndSendMessage(
-  id, todaysPrice, min, max, name, buyLimit, description, icon,
+  id, todaysPrice, min, max, minTimeInMs, maxTimeInMs, name, buyLimit, description, icon,
 ) {
   const nearMin = todaysPrice < (min * 1.1)
   const nearMax = todaysPrice > (max * 0.9)
   const hasOverlap = (max * 0.9) <= (min * 1.1)
   const potentialProfit = (max - todaysPrice) * buyLimit
   const potentialLoss = (min - todaysPrice) * buyLimit
+  const todaysDate = new Date()
+  const maxDate = new Date(maxTimeInMs).toLocaleDateString()
+  const minDate = new Date(minTimeInMs).toLocaleDateString()
+  const daysSinceMax = Math.round((todaysDate - maxTimeInMs) / (86400000))
+  const daysSinceMin = Math.round((todaysDate - minTimeInMs) / (86400000))
 
   const exclude = potentialProfit <= 2000000
   const isSafeBet = potentialProfit > 2000000 && potentialProfit <= 4000000
@@ -134,16 +143,43 @@ function calculateProfitAndSendMessage(
   let channelName = isSafeBet ? 'safe-bets' : ''
   channelName = isRiskyBet ? 'risky-bets' : channelName
   channelName = isHolyCheeks ? 'holy-ch33ks-bets' : channelName
-  const isInOurLists = smittList.includes(parseInt(id, 10)) || nigelList.includes(parseInt(id, 10))
 
   const buyMessage = {
     embed: createEmbed({
-      name, id, description, todaysPrice, max, min, potentialProfit, potentialLoss, icon, buyLimit, buyOrSell: '__**BUY!**__',
+      name,
+      id,
+      description,
+      todaysPrice,
+      min,
+      max,
+      minDate,
+      maxDate,
+      daysSinceMin,
+      daysSinceMax,
+      potentialProfit,
+      potentialLoss,
+      icon,
+      buyLimit,
+      buyOrSell: '__**BUY!**__',
     }),
   }
   const sellMessage = {
     embed: createEmbed({
-      name, id, description, todaysPrice, max, min, potentialProfit, potentialLoss, icon, buyLimit, buyOrSell: '__**SELL!**__',
+      name,
+      id,
+      description,
+      todaysPrice,
+      min,
+      max,
+      minDate,
+      maxDate,
+      daysSinceMin,
+      daysSinceMax,
+      potentialProfit,
+      potentialLoss,
+      icon,
+      buyLimit,
+      buyOrSell: '__**SELL!**__',
     }),
   }
 
@@ -151,16 +187,11 @@ function calculateProfitAndSendMessage(
 
   if (dontFilter && nearMin) {
     sendChannelMessage(channelName, buyMessage)
-  }
-  if (dontFilter && nearMax) {
-    sendChannelMessage(channelName, sellMessage)
-  }
-
-  if (dontFilter && nearMin && isInOurLists) {
     if (smittList.includes(parseInt(id, 10))) sendChannelMessage('smittward-list', buyMessage)
     if (nigelList.includes(parseInt(id, 10))) sendChannelMessage('nigel-list', buyMessage)
   }
-  if (dontFilter && nearMax && isInOurLists) {
+  if (dontFilter && nearMax) {
+    sendChannelMessage(channelName, sellMessage)
     if (smittList.includes(parseInt(id, 10))) sendChannelMessage('smittward-list', sellMessage)
     if (nigelList.includes(parseInt(id, 10))) sendChannelMessage('nigel-list', sellMessage)
   }
@@ -180,6 +211,8 @@ function getGraph({
         const { daily } = res2.data
         let max = 0
         let min = 2147483647
+        let maxTimeInMs = 0
+        let minTimeInMs = 0
         let i = 0
         let todaysPrice = 0
         const dailyTimes = Object.keys(daily)
@@ -188,14 +221,29 @@ function getGraph({
         if (isGreaterThan100gp) {
           dailyTimes.forEach((key) => {
             const price = daily[key]
-            max = (price > max) ? price : max
-            min = (price < min) ? price : min
+            if (price > max) {
+              max = price
+              maxTimeInMs = parseInt(key, 10)
+            }
+            if (price < min) {
+              min = price
+              minTimeInMs = parseInt(key, 10)
+            }
             if (i === dailyTimes.length - 1) todaysPrice = price
             i += 1
           })
           if (!!id && !!todaysPrice && !!min && !!max && !!name) {
             calculateProfitAndSendMessage(
-              id, todaysPrice, min, max, name, buyLimit, description, icon,
+              id,
+              todaysPrice,
+              min,
+              max,
+              minTimeInMs,
+              maxTimeInMs,
+              name,
+              buyLimit,
+              description,
+              icon,
             )
           } else {
             sendChannelMessage('missed-items', `missing data - ${name} :  max: ${max}, min: ${min}, today: ${todaysPrice}`)
