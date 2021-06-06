@@ -528,8 +528,8 @@ async function main() {
     }
 
     if (serverName === 'RS 🔥' && channelName === 'lul') {
-      console.log('Waiting 11 hours to start bot...')
-      await sleep(oneHour * 11)
+      console.log('Waiting 10 hours to start bot...')
+      await sleep(oneHour * 10)
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -546,6 +546,7 @@ async function main() {
         const date = new Date()
         const timeStamp = `( ${date.toLocaleDateString()} - ${date.toLocaleTimeString()} )`
         console.log(`Running daily price checks... ${timeStamp}`)
+        sendChannelMessage('bot-logs', `Running daily price checks... ${timeStamp}`)
         getItemsThenGraph()
         // eslint-disable-next-line no-await-in-loop
         await sleep(oneHour * 24)
