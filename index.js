@@ -1,8 +1,11 @@
 require('dotenv').config()
-const Discord = require('discord.js')
 const axios = require('axios').default
 
-const client = new Discord.Client()
+// https://discordjs.guide/additional-info/changes-in-v13.html#guild
+const Discord = require('discord.js')
+const { Client, Intents } = require('discord.js')
+
+const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] })
 let tracker = 0
 let allOverlaps = []
 let smittList = []
@@ -20,7 +23,11 @@ function getChannel(channelName) {
 function sendChannelMessage(channelName, message) {
   const theChannel = getChannel(channelName)
   if (theChannel) {
-    theChannel.send(message)
+    try {
+      theChannel.send(message)
+    } catch (error) {
+      console.log(`Error sending message to channel: '${theChannel}'`)
+    }
   } else {
     console.log(`Channel: ${channelName} does not exist`)
   }
@@ -42,6 +49,7 @@ function createEmbed({
   icon,
   buyLimit,
   buyOrSell,
+  isMembers,
 }) {
   const fields = []
   const emptyField = {
@@ -100,6 +108,11 @@ function createEmbed({
         value: `${potentialLoss.toLocaleString()} gp`,
         inline: true,
       },
+      {
+        name: 'Members?',
+        value: isMembers,
+        inline: false,
+      },
       ...fields,
     ],
     timestamp: new Date(),
@@ -121,7 +134,7 @@ function printTrackDataAndSendOverlaps(name, description, hasOverlap, id) {
 }
 
 function calculateProfitAndSendMessage(
-  id, todaysPrice, min, max, minTimeInMs, maxTimeInMs, name, buyLimit, description, icon,
+  id, todaysPrice, min, max, minTimeInMs, maxTimeInMs, name, buyLimit, description, icon, isMembers,
 ) {
   const nearMin = todaysPrice < (min * 1.1)
   const nearMax = todaysPrice > (max * 0.9)
@@ -145,7 +158,7 @@ function calculateProfitAndSendMessage(
   channelName = isHolyCheeks ? 'holy-ch33ks-bets' : channelName
 
   const buyMessage = {
-    embed: createEmbed({
+    embeds: [createEmbed({
       name,
       id,
       description,
@@ -161,10 +174,11 @@ function calculateProfitAndSendMessage(
       icon,
       buyLimit,
       buyOrSell: '__**BUY!**__',
-    }),
+      isMembers,
+    })],
   }
   const sellMessage = {
-    embed: createEmbed({
+    embeds: [createEmbed({
       name,
       id,
       description,
@@ -180,7 +194,8 @@ function calculateProfitAndSendMessage(
       icon,
       buyLimit,
       buyOrSell: '__**SELL!**__',
-    }),
+      isMembers,
+    })],
   }
 
   // printTrackDataAndSendOverlaps(name, description, hasOverlap, id)
@@ -197,11 +212,16 @@ function calculateProfitAndSendMessage(
   }
 }
 
+async function isItemMembers(id) {
+  const getItemDetails = await axios.get(`https://services.runescape.com/m=itemdb_rs/api/catalogue/detail.json?item=${id}`)
+  return getItemDetails?.data?.item?.members || 'undefined'
+}
+
 function getGraph({
   name, id, buyLimit, description, icon, timeout,
 }) {
   return axios.get(`https://secure.runescape.com/m=itemdb_rs/api/graph/${id}.json`)
-    .then((res2) => {
+    .then(async (res2) => {
       // if (!res2 || !res2.data || !res2.data.daily) {
       if (!(res2?.data?.daily)) {
         setTimeout(() => getGraph({
@@ -233,6 +253,7 @@ function getGraph({
             i += 1
           })
           if (!!id && !!todaysPrice && !!min && !!max && !!name) {
+            const isMembers = await isItemMembers(id)
             calculateProfitAndSendMessage(
               id,
               todaysPrice,
@@ -244,6 +265,7 @@ function getGraph({
               buyLimit,
               description,
               icon,
+              isMembers,
             )
           } else {
             sendChannelMessage('missed-items', `missing data - ${name} :  max: ${max}, min: ${min}, today: ${todaysPrice}`)
@@ -440,7 +462,8 @@ function getAllItems() {
     'https://raw.githubusercontent.com/NielsTack/runescape-3-item-database/master/iteminfo_filtered.json',
   )
     .then((res) => res.data)
-    // .then(() => testingItems)
+    .catch(() => { })
+  // .then(() => testingItems)
 }
 
 function chunkArray(array, size) {
@@ -480,16 +503,15 @@ function getItemsThenGraph() {
 
     chunks.forEach((chunk, index) => {
       chunk.forEach((curItem) => {
-        const id = curItem[0]
         const {
-          name, buylimit, type, icon,
+          id, name, buylimit, type, icon,
         } = curItem[1]
         const buyLimit = buylimit
         const description = type
         const timeout = 5000 * index
 
         setTimeout(() => getGraph({
-          name, id, buyLimit, description, icon, timeout,
+          name, id: id.toString(), buyLimit, description, icon, timeout,
         }), timeout)
       })
     })
@@ -502,11 +524,13 @@ function sleep(ms) {
 
 function clearBetsChannel(message) {
   const { name } = message.channel
-  message.channel.delete().then(() => {
-    message.guild.channels.create(name, Discord.CategoryChannel).then(() => {
-      getChannel(name).setParent(getChannel('bets').id)
+  if (name) {
+    message.channel.delete().then(() => {
+      message.guild.channels.create(name, Discord.CategoryChannel).then(() => {
+        getChannel(name).setParent(getChannel('bets').id)
+      })
     })
-  })
+  }
 }
 
 async function main() {
@@ -518,7 +542,7 @@ async function main() {
 
   client.login(process.env.TOKEN)
 
-  client.on('message', async (message) => {
+  client.on('messageCreate', async (message) => {
     const serverName = message.guild.name
     const channelName = message.channel.name
     const oneHour = 3600000
@@ -527,12 +551,19 @@ async function main() {
       clearBetsChannel(message)
     }
 
-    if (serverName === 'RS 🔥' && channelName === 'lul') {
-      console.log('Waiting 10 hours to start bot...')
-      await sleep(oneHour * 10)
+    if (serverName === 'RS 🔥' && channelName === 'bot-commands') {
+      if (message.content.match(/\d+\shour(s?)/g)) {
+        const waitMsg = message.content.split(/\s/g)
+        const numHours = parseInt(waitMsg[0], 10)
+        console.log(`Waiting ${numHours} hours to start bot...`)
+        setTimeout(() => {
+          sendChannelMessage('bot-commands', 'go')
+        }, (oneHour * numHours))
+      } else if (message.content.match(/go/g)) {
+        setTimeout(() => {
+          sendChannelMessage('bot-commands', 'go')
+        }, (oneHour * 24))
 
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
         sendChannelMessage('safe-bets', '!clear')
         // eslint-disable-next-line no-await-in-loop
         await sleep(1000)
